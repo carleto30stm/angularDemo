@@ -1,0 +1,284 @@
+<div class="page-wrapper">
+
+  <!-- ── HEADER ── -->
+  <header class="page-header">
+    <div class="header-left">
+      <span class="header-icon">&#9632;</span>
+      <div>
+        <h1 class="header-title">Gestión de Productos</h1>
+        <p class="header-sub">{{ pagination().total }} registros en total</p>
+      </div>
+    </div>
+    <button class="btn-primary" (click)="abrirCrear()">
+      <span class="btn-icon">+</span> Nuevo Producto
+    </button>
+  </header>
+
+  <!-- ── TOOLBAR ── -->
+  <div class="toolbar">
+    <div class="search-wrapper">
+      <span class="search-icon">&#128269;</span>
+      <input
+        class="search-input"
+        type="text"
+        placeholder="Buscar por nombre o EAN..."
+        [ngModel]="search()"
+        (ngModelChange)="onSearch($event)"
+      />
+    </div>
+    <div class="sort-info" *ngIf="sortBy() !== 'productoId' || sortDir() !== 'ASC'">
+      Ordenado por <strong>{{ sortBy() }}</strong>
+      <span class="sort-arrow">{{ sortDir() === 'ASC' ? '↑' : '↓' }}</span>
+    </div>
+  </div>
+
+  <!-- ── TABLA ── -->
+  <div class="table-card">
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="th-sortable" (click)="onSort('productoId')">
+              ID
+              <span class="sort-indicator" [class.active]="sortBy() === 'productoId'">
+                {{ sortBy() === 'productoId' ? (sortDir() === 'ASC' ? '↑' : '↓') : '↕' }}
+              </span>
+            </th>
+            <th>EAN</th>
+            <th class="th-sortable" (click)="onSort('nombre')">
+              Nombre
+              <span class="sort-indicator" [class.active]="sortBy() === 'nombre'">
+                {{ sortBy() === 'nombre' ? (sortDir() === 'ASC' ? '↑' : '↓') : '↕' }}
+              </span>
+            </th>
+            <th class="th-sortable" (click)="onSort('precio')">
+              Precio
+              <span class="sort-indicator" [class.active]="sortBy() === 'precio'">
+                {{ sortBy() === 'precio' ? (sortDir() === 'ASC' ? '↑' : '↓') : '↕' }}
+              </span>
+            </th>
+            <th class="th-sortable" (click)="onSort('stock')">
+              Stock
+              <span class="sort-indicator" [class.active]="sortBy() === 'stock'">
+                {{ sortBy() === 'stock' ? (sortDir() === 'ASC' ? '↑' : '↓') : '↕' }}
+              </span>
+            </th>
+            <th>Actualizado</th>
+            <th class="th-actions">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (loading()) {
+            <tr *ngFor="let i of [1,2,3,4,5]">
+              <td colspan="7"><div class="skeleton"></div></td>
+            </tr>
+          } @else if (productos().length === 0) {
+            <tr>
+              <td colspan="7" class="empty-cell">
+                <span class="empty-icon">&#128681;</span>
+                <p>Sin resultados</p>
+              </td>
+            </tr>
+          } @else {
+            @for (p of productos(); track p.producto_id) {
+              <tr class="data-row">
+                <td><span class="id-badge">{{ p.producto_id }}</span></td>
+                <td><code class="ean-code">{{ p.codigo_ean }}</code></td>
+                <td>
+                  <span class="product-name">{{ p.nombre }}</span>
+                  <span class="product-desc">{{ p.descripcion | slice:0:60 }}{{ p.descripcion.length > 60 ? '...' : '' }}</span>
+                </td>
+                <td>
+                  <span class="price-value">{{ p.precio | currency:'USD':'symbol':'1.2-2' }}</span>
+                </td>
+                <td>
+                  <span class="stock-badge" [class.stock-low]="p.stock < 10" [class.stock-ok]="p.stock >= 10">
+                    {{ p.stock }}
+                  </span>
+                </td>
+                <td>
+                  <span class="date-value">{{ p.updated_at | date:'dd/MM/yy HH:mm' }}</span>
+                </td>
+                <td class="actions-cell">
+                  <button class="btn-edit" (click)="abrirEditar(p)" title="Editar">&#9998;</button>
+                  <button class="btn-delete" (click)="confirmarEliminar(p)" title="Eliminar">&#128465;</button>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── PAGINACIÓN ── -->
+    @if (pagination().totalPages > 1) {
+      <div class="pagination">
+        <button class="page-btn" [disabled]="pagination().page === 0" (click)="goToPage(pagination().page - 1)">
+          &#8592;
+        </button>
+        @for (p of pages(); track p) {
+          <button
+            class="page-btn"
+            [class.active]="p === pagination().page"
+            (click)="goToPage(p)"
+          >{{ p + 1 }}</button>
+        }
+        <button class="page-btn" [disabled]="pagination().page === pagination().totalPages - 1" (click)="goToPage(pagination().page + 1)">
+          &#8594;
+        </button>
+        <span class="page-info">
+          Página {{ pagination().page + 1 }} de {{ pagination().totalPages }}
+          &mdash; {{ pagination().total }} registros
+        </span>
+      </div>
+    }
+  </div>
+
+</div>
+
+<!-- ══════════ MODAL CREAR / EDITAR ══════════ -->
+@if (modalVisible()) {
+  <div class="modal-backdrop" (click)="cerrarModal()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2 class="modal-title">{{ modalMode() === 'crear' ? 'Nuevo Producto' : 'Editar Producto' }}</h2>
+        <button class="modal-close" (click)="cerrarModal()">&#10005;</button>
+      </div>
+
+      @if (apiError()) {
+        <div class="alert-error">
+          <strong>{{ apiError()!.codigo }}</strong>: {{ apiError()!.message }}
+        </div>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="guardar()" novalidate class="modal-form">
+        <!-- EAN -->
+        <div class="form-group">
+          <label class="form-label">Código EAN <span class="required">*</span></label>
+          <input
+            class="form-input"
+            [class.input-error]="controlHasError('codigo_ean')"
+            formControlName="codigo_ean"
+            placeholder="4006381333931"
+            maxlength="13"
+          />
+          @if (controlHasError('codigo_ean')) {
+            <span class="form-error">{{ getControlError('codigo_ean') }}</span>
+          }
+        </div>
+
+        <!-- Nombre -->
+        <div class="form-group">
+          <label class="form-label">Nombre <span class="required">*</span></label>
+          <input
+            class="form-input"
+            [class.input-error]="controlHasError('nombre')"
+            formControlName="nombre"
+            placeholder="Ej: Laptop Dell XPS 13"
+          />
+          @if (controlHasError('nombre')) {
+            <span class="form-error">{{ getControlError('nombre') }}</span>
+          }
+        </div>
+
+        <!-- Descripción -->
+        <div class="form-group">
+          <label class="form-label">Descripción <span class="required">*</span></label>
+          <textarea
+            class="form-input form-textarea"
+            [class.input-error]="controlHasError('descripcion')"
+            formControlName="descripcion"
+            rows="3"
+            placeholder="Descripción detallada del producto..."
+          ></textarea>
+          @if (controlHasError('descripcion')) {
+            <span class="form-error">{{ getControlError('descripcion') }}</span>
+          }
+        </div>
+
+        <!-- Precio + Stock -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Precio (USD) <span class="required">*</span></label>
+            <input
+              class="form-input"
+              [class.input-error]="controlHasError('precio')"
+              formControlName="precio"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="0.00"
+            />
+            @if (controlHasError('precio')) {
+              <span class="form-error">{{ getControlError('precio') }}</span>
+            }
+          </div>
+          <div class="form-group">
+            <label class="form-label">Stock <span class="required">*</span></label>
+            <input
+              class="form-input"
+              [class.input-error]="controlHasError('stock')"
+              formControlName="stock"
+              type="number"
+              min="0"
+              placeholder="0"
+            />
+            @if (controlHasError('stock')) {
+              <span class="form-error">{{ getControlError('stock') }}</span>
+            }
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" (click)="cerrarModal()" [disabled]="submitting()">
+            Cancelar
+          </button>
+          <button type="submit" class="btn-primary" [disabled]="submitting()">
+            @if (submitting()) {
+              <span class="spinner"></span> Guardando...
+            } @else {
+              {{ modalMode() === 'crear' ? 'Crear Producto' : 'Guardar Cambios' }}
+            }
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ══════════ MODAL ELIMINAR ══════════ -->
+@if (deleteTarget()) {
+  <div class="modal-backdrop" (click)="cancelarEliminar()">
+    <div class="modal-box modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2 class="modal-title danger-title">&#9888; Confirmar Eliminación</h2>
+        <button class="modal-close" (click)="cancelarEliminar()">&#10005;</button>
+      </div>
+      <div class="delete-body">
+        <p>¿Estás seguro de que deseas eliminar el producto?</p>
+        <div class="delete-product-info">
+          <span class="id-badge">ID {{ deleteTarget()!.producto_id }}</span>
+          <strong>{{ deleteTarget()!.nombre }}</strong>
+        </div>
+        <p class="delete-warning">Esta acción no se puede deshacer.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="cancelarEliminar()" [disabled]="deleting()">Cancelar</button>
+        <button class="btn-danger" (click)="ejecutarEliminar()" [disabled]="deleting()">
+          @if (deleting()) {
+            <span class="spinner"></span> Eliminando...
+          } @else {
+            Eliminar
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ══════════ TOAST ══════════ -->
+@if (toast()) {
+  <div class="toast" [class.toast-success]="toast()!.type === 'success'" [class.toast-error]="toast()!.type === 'error'">
+    {{ toast()!.msg }}
+  </div>
+}
