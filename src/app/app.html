@@ -1,1 +1,7 @@
+@if (authService.currentUser(); as user) {
+  <header class="app-header">
+    <span class="app-header__user">{{ user.username }}</span>
+    <button class="app-header__logout" (click)="authService.logout()">Cerrar sesión</button>
+  </header>
+}
 <router-outlet />
