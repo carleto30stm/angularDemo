@@ -26,6 +26,17 @@
         (ngModelChange)="onSearch($event)"
       />
     </div>
+    <div class="currency-selector">
+      <span class="currency-label">&#128176; Moneda:</span>
+      <select class="currency-select" [ngModel]="selectedCurrency()" (ngModelChange)="onCurrencyChange($event)">
+        @for (c of CURRENCIES; track c) {
+          <option [value]="c">{{ c }}</option>
+        }
+      </select>
+      @if (loadingRates()) {
+        <span class="rate-loading">cargando tasas...</span>
+      }
+    </div>
     <div class="sort-info" *ngIf="sortBy() !== 'productoId' || sortDir() !== 'ASC'">
       Ordenado por <strong>{{ sortBy() }}</strong>
       <span class="sort-arrow">{{ sortDir() === 'ASC' ? '↑' : '↓' }}</span>
@@ -89,7 +100,12 @@
                   <span class="product-desc">{{ p.descripcion | slice:0:60 }}{{ p.descripcion.length > 60 ? '...' : '' }}</span>
                 </td>
                 <td>
-                  <span class="price-value">{{ p.precio | currency:'USD':'symbol':'1.2-2' }}</span>
+                  <span class="price-value">
+                    {{ +(p.precio || 0) * currentRate() | currency:selectedCurrency():'symbol':'1.2-2' }}
+                  </span>
+                  @if (selectedCurrency() !== 'USD') {
+                    <span class="price-original">(USD {{ (p.precio || 0) | currency:'USD':'symbol':'1.2-2' }})</span>
+                  }
                 </td>
                 <td>
                   <span class="stock-badge" [class.stock-low]="p.stock < 10" [class.stock-ok]="p.stock >= 10">

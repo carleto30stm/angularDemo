@@ -1,10 +1,12 @@
 import {
-  Component, inject, signal, computed, OnInit, ChangeDetectionStrategy
+  Component, inject, signal, computed, effect, OnInit,
+  ChangeDetectionStrategy, ChangeDetectorRef
 } from '@angular/core';
 import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators, AbstractControl } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ProductoService } from '../../../core/services/producto.service';
+import { ExchangeRateService } from '../../../core/services/exchange-rate.service';
 import {
   Producto, PaginationInfo, ApiError, ErrorDetail,
   ProductoCreateRequest, ProductoUpdateRequest, SortField, SortDir
@@ -20,7 +22,9 @@ import {
 })
 export class ProductosListComponent implements OnInit {
   private readonly svc = inject(ProductoService);
+  private readonly exchangeSvc = inject(ExchangeRateService);
   private readonly fb = inject(FormBuilder);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   // ──────────── Estado de la lista ────────────
   productos = signal<Producto[]>([]);
@@ -29,6 +33,27 @@ export class ProductosListComponent implements OnInit {
   search = signal('');
   sortBy = signal<SortField>('productoId');
   sortDir = signal<SortDir>('ASC');
+
+  // ──────────── Exchange Rates ────────────
+  readonly CURRENCIES = ['USD', 'EUR', 'MXN', 'GBP', 'COP'];
+  selectedCurrency = signal('USD');
+  exchangeRates = signal<Record<string, number>>({});
+  loadingRates = signal(false);
+
+  currentRate = computed(() => {
+    const moneda = this.selectedCurrency();
+    if (moneda === 'USD') return 1;
+    return this.exchangeRates()[moneda] ?? 1;
+  });
+
+  constructor() {
+    // Cuando cambia currentRate (señal computed), fuerza detección de cambios
+    // en OnPush para que el @for re-evalúe el precio en todos los items
+    effect(() => {
+      this.currentRate(); // suscribe la dependencia
+      this.cdr.markForCheck();
+    });
+  }
 
   // ──────────── Estado del modal ────────────
   modalVisible = signal(false);
@@ -62,6 +87,23 @@ export class ProductosListComponent implements OnInit {
 
   ngOnInit(): void {
     this.cargar();
+    this.cargarTasas();
+  }
+
+  cargarTasas(): void {
+    this.loadingRates.set(true);
+    this.exchangeSvc.getLatestRates().subscribe({
+      next: res => {
+        this.exchangeRates.set(res.rates);
+        this.loadingRates.set(false);
+      },
+      error: () => this.loadingRates.set(false)
+    });
+  }
+
+  onCurrencyChange(moneda: string): void {
+    this.selectedCurrency.set(moneda);
+    this.cdr.markForCheck();
   }
 
   cargar(page = 0): void {
